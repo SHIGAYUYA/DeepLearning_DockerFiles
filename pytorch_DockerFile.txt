@@ -133,8 +133,8 @@ RUN ${PIP} --no-cache-dir install \
         sklearn
 
 # pytorchのインストール
-RUN ${PIP}install https://download.pytorch.org/whl/cu100/torch-1.0.1.post2-cp37-cp37m-linux_x86_64.whl
-RUN ${PIP}install torchvision
+RUN ${PIP} install https://download.pytorch.org/whl/cu100/torch-1.0.1.post2-cp36-cp36m-linux_x86_64.whl
+RUN ${PIP} install torchvision
 
 # 日本語設定
 RUN apt-get update &&  apt-get -y install language-pack-ja
