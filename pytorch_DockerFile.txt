@@ -1,13 +1,13 @@
 ARG UBUNTU_VERSION=16.04
 
 ARG ARCH=
-ARG CUDA=9.2
+ARG CUDA=10.0
 FROM nvidia/cuda${ARCH:+-$ARCH}:${CUDA}-base-ubuntu${UBUNTU_VERSION} as base
 
 # FROM内で再定義されるために再度宣言が必要らしい(前の値は保持できる)
 ARG ARCH
 ARG CUDA
-ARG CUDNN=7.4.2.24-1
+ARG CUDNN=7.5.0.56-1
 ENV NCCL_VERSION 2.4.2-1
 
 # bash 上での作業開始
@@ -56,8 +56,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 		libssl-dev \
 	&& rm -rf /var/lib/apt/lists/*
 
-ENV GPG_KEY 97FC712E4C024BBEA48A61ED3A5CA953F73C700D
-ENV PYTHON_VERSION 3.5.2
+ENV GPG_KEY 0D96DF4D4110E5C43FBFB17F2D347EA6AA65421D
+ENV PYTHON_VERSION 3.6.8
 
 RUN set -ex \
 	\
@@ -114,6 +114,10 @@ RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
     git \
     cmake \
+    vim \
+    ca-certificates \
+    libjpeg-dev \
+    libpng-dev \
     libblas3 \
     libblas-dev \
     && \
@@ -128,11 +132,9 @@ RUN ${PIP} --no-cache-dir install \
         scipy \
         sklearn
 
-# cupy chainarのインストール
-ARG CHAINAR_VERSION=6.0.0b3
-RUN CHAINER_BUILD_CHAINERX=1 CHAINERX_BUILD_CUDA=1 ${PIP} install --no-cache-dir chainer${CHAINAR_VERSION:+==${CHAINAR_VERSION}} cupy-cuda92${CHAINAR_VERSION:+==${CHAINAR_VERSION}}
-#RUN ${PIP} install --no-cache-dir chainer${CHAINAR_VERSION:+==${CHAINAR_VERSION}} cupy-cuda92${CHAINAR_VERSION:+==${CHAINAR_VERSION}}
-
+# pytorchのインストール
+RUN ${PIP}install https://download.pytorch.org/whl/cu100/torch-1.0.1.post2-cp37-cp37m-linux_x86_64.whl
+RUN ${PIP}install torchvision
 
 # 日本語設定
 RUN apt-get update &&  apt-get -y install language-pack-ja
