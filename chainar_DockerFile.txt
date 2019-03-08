@@ -119,6 +119,15 @@ RUN apt-get update -y && \
     && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
+RUN pip --no-cache-dir install \
+        Pillow \
+        h5py \
+        matplotlib \
+        numpy \
+        pandas \
+        scipy \
+        sklearn
+
 # cupy chainarのインストール
 ARG CHAINAR_VERSION=6.0.0b3
 RUN CHAINER_BUILD_CHAINERX=1 CHAINERX_BUILD_CUDA=1 ${PIP} install --no-cache-dir chainer${CHAINAR_VERSION:+==${CHAINAR_VERSION}} cupy-cuda92${CHAINAR_VERSION:+==${CHAINAR_VERSION}}

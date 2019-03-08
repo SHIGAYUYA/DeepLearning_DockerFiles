@@ -101,6 +101,17 @@ ENV PIP=pip3
 RUN ${PIP} install --upgrade pip
 RUN ${PIP} install --upgrade setuptools
 
+RUN pip --no-cache-dir install \
+        Pillow \
+        h5py \
+        keras_applications \
+        keras_preprocessing \
+        matplotlib \
+        numpy \
+        pandas \
+        scipy \
+        sklearn
+
 # Tensorflowのインストール
 ARG TF_PACKAGE=tensorflow-gpu
 ARG TF_PACKAGE_VERSION=1.11.0
