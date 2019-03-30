@@ -1,0 +1,135 @@
+ARG UBUNTU_VERSION=16.04
+
+ARG ARCH=
+ARG CUDA=9.2
+FROM nvidia/cuda${ARCH:+-$ARCH}:${CUDA}-base-ubuntu${UBUNTU_VERSION} as base
+
+# FROM内で再定義されるために再度宣言が必要らしい(前の値は保持できる)
+ARG ARCH
+ARG CUDA
+ARG CUDNN=7.4.2.24-1
+ENV NCCL_VERSION 2.4.2-1
+
+# bash 上での作業開始
+SHELL ["/bin/bash", "-c"]
+
+# ビルドツール系
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        curl \
+        libfreetype6-dev \
+        libhdf5-serial-dev \
+        libzmq3-dev \
+        pkg-config \
+        software-properties-common \
+        unzip \
+        wget \
+        zlib1g-dev && \
+     rm -rf /var/lib/apt/lists/*
+
+# Chainer の依存しているライブラリ(ビルドツールとcudnn系？)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        cuda-libraries-${CUDA/./-} \
+        cuda-nvtx-${CUDA/./-} \
+        libnccl2=${NCCL_VERSION}+cuda${CUDA} && \
+    apt-mark hold libnccl2 && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        cuda-libraries-dev-${CUDA/./-} \
+        cuda-nvml-dev-${CUDA/./-} \
+        cuda-minimal-build-${CUDA/./-} \
+        cuda-command-line-tools-${CUDA/./-} \
+        libnccl-dev=${NCCL_VERSION}+cuda${CUDA} && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV LIBRARY_PATH /usr/local/cuda/lib64/stubs
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+            libcudnn7=${CUDNN}+cuda${CUDA} \
+            libcudnn7-dev=${CUDNN}+cuda${CUDA} && \
+    apt-mark hold libcudnn7 && \
+    rm -rf /var/lib/apt/lists/
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+		tk-dev \
+		libssl-dev \
+	&& rm -rf /var/lib/apt/lists/*
+
+ENV PYTHON_VERSION 3.6.8
+
+RUN set -ex \
+	\
+	&& wget -O python.tar.xz "https://www.python.org/ftp/python/${PYTHON_VERSION%%[a-z]*}/Python-$PYTHON_VERSION.tar.xz" \
+	&& mkdir -p /usr/src/python \
+	&& tar -xJC /usr/src/python --strip-components=1 -f python.tar.xz \
+	&& rm python.tar.xz \
+	\
+	&& cd /usr/src/python \
+	&& gnuArch="$(dpkg-architecture --query DEB_BUILD_GNU_TYPE)" \
+	&& ./configure \
+		--build="$gnuArch" \
+		--enable-loadable-sqlite-extensions \
+		--enable-shared \
+		--with-system-expat \
+		--with-system-ffi \
+		--with-ensurepip \
+	&& make -j "$(nproc)" \
+	&& make install \
+	&& ldconfig \
+	\
+	&& find /usr/local -depth \
+		\( \
+			\( -type d -a \( -name test -o -name tests \) \) \
+			-o \
+			\( -type f -a \( -name '*.pyc' -o -name '*.pyo' \) \) \
+		\) -exec rm -rf '{}' + \
+	&& rm -rf /usr/src/python \
+	\
+	&& python3 --version
+
+# make some useful symlinks that are expected to exist
+RUN cd /usr/local/bin \
+	&& ln -s idle3 idle \
+	&& ln -s pydoc3 pydoc \
+	&& ln -s python3 python \
+	&& ln -s python3-config python-config
+
+ENV PIP=pip3 
+
+
+RUN ${PIP} install --upgrade pip
+RUN ${PIP} install --upgrade setuptools
+
+RUN ${PIP} install wheel
+
+RUN apt-get update -y && \
+    apt-get install -y --no-install-recommends \
+    git \
+    cmake \
+    libblas3 \
+    libblas-dev \
+    && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+
+RUN ${PIP} --no-cache-dir install \
+        Pillow \
+        h5py \
+        matplotlib \
+        numpy \
+        pandas \
+        scipy \
+        sklearn
+
+# cupy chainarのインストール
+ARG CHAINAR_VERSION=5.3.0
+RUN CHAINER_BUILD_CHAINERX=1 CHAINERX_BUILD_CUDA=1 ${PIP} install --no-cache-dir chainer${CHAINAR_VERSION:+==${CHAINAR_VERSION}} cupy-cuda92${CHAINAR_VERSION:+==${CHAINAR_VERSION}}
+#RUN ${PIP} install --no-cache-dir chainer${CHAINAR_VERSION:+==${CHAINAR_VERSION}} cupy-cuda92${CHAINAR_VERSION:+==${CHAINAR_VERSION}}
+
+
+# 日本語設定
+RUN apt-get update &&  apt-get -y install language-pack-ja
+ENV LANG ja_JP.UTF-8
+ENV LANGUAGE ja_JP:ja
+ENV LC_ALL ja_JP.UTF-8
+ENV TZ JST-9
