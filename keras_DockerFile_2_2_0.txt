@@ -1,0 +1,123 @@
+ARG UBUNTU_VERSION=16.04
+
+ARG ARCH=
+ARG CUDA=9.0
+FROM nvidia/cuda${ARCH:+-$ARCH}:${CUDA}-base-ubuntu${UBUNTU_VERSION} as base
+
+# FROM内で再定義されるために再度宣言が必要らしい(前の値は保持できる)
+ARG ARCH
+ARG CUDA
+ARG CUDNN=7.2.1.38-1
+
+# bash 上での作業開始
+SHELL ["/bin/bash", "-c"]
+
+# Tensorflow の依存しているライブラリ(ビルドツールとcudnn系？)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        cuda-command-line-tools-${CUDA/./-} \
+        cuda-cublas-${CUDA/./-} \
+        cuda-cufft-${CUDA/./-} \
+        cuda-curand-${CUDA/./-} \
+        cuda-cusolver-${CUDA/./-} \
+        cuda-cusparse-${CUDA/./-} \
+        curl \
+        libcudnn7=${CUDNN}+cuda${CUDA} \
+        libfreetype6-dev \
+        libhdf5-serial-dev \
+        libzmq3-dev \
+        pkg-config \
+        software-properties-common \
+        unzip
+
+RUN [ ${ARCH} = ppc64le ] || (apt-get update && \
+        apt-get install nvinfer-runtime-trt-repo-ubuntu1604-5.0.2-ga-cuda${CUDA} \
+        && apt-get update \
+        && apt-get install -y --no-install-recommends libnvinfer5=5.0.2-1+cuda${CUDA} \
+        && apt-get clean \
+        && rm -rf /var/lib/apt/lists/*)
+
+# CUDA用の設定
+ENV LD_LIBRARY_PATH /usr/local/cuda/extras/CUPTI/lib64:$LD_LIBRARY_PATH
+
+
+# python install
+RUN apt-get update -y && apt-get install -yq wget zlib1g-dev
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+		tk-dev \
+		libssl-dev \
+	&& rm -rf /var/lib/apt/lists/*
+
+ENV GPG_KEY 0D96DF4D4110E5C43FBFB17F2D347EA6AA65421D
+ENV PYTHON_VERSION 3.6.8
+
+RUN set -ex \
+	\
+	&& wget -O python.tar.xz "https://www.python.org/ftp/python/${PYTHON_VERSION%%[a-z]*}/Python-$PYTHON_VERSION.tar.xz" \
+	&& mkdir -p /usr/src/python \
+	&& tar -xJC /usr/src/python --strip-components=1 -f python.tar.xz \
+	&& rm python.tar.xz \
+	\
+	&& cd /usr/src/python \
+	&& gnuArch="$(dpkg-architecture --query DEB_BUILD_GNU_TYPE)" \
+	&& ./configure \
+		--build="$gnuArch" \
+		--enable-loadable-sqlite-extensions \
+		--enable-shared \
+		--with-system-expat \
+		--with-system-ffi \
+		--with-ensurepip \
+	&& make -j "$(nproc)" \
+	&& make install \
+	&& ldconfig \
+	\
+	&& find /usr/local -depth \
+		\( \
+			\( -type d -a \( -name test -o -name tests \) \) \
+			-o \
+			\( -type f -a \( -name '*.pyc' -o -name '*.pyo' \) \) \
+		\) -exec rm -rf '{}' + \
+	&& rm -rf /usr/src/python \
+	\
+	&& python3 --version
+
+# make some useful symlinks that are expected to exist
+RUN cd /usr/local/bin \
+	&& ln -s idle3 idle \
+	&& ln -s pydoc3 pydoc \
+	&& ln -s python3 python \
+	&& ln -s python3-config python-config
+
+ENV PIP=pip3 
+
+
+RUN ${PIP} install --upgrade pip
+RUN ${PIP} install --upgrade setuptools
+
+RUN ${PIP} --no-cache-dir install \
+        Pillow \
+        h5py \
+        pydot \
+        matplotlib \
+        numpy \
+        pandas \
+        scipy \
+        sklearn
+
+# Tensorflowのインストール
+ARG TF_PACKAGE=tensorflow-gpu
+ARG TF_PACKAGE_VERSION=1.12.0
+RUN ${PIP} install ${TF_PACKAGE}${TF_PACKAGE_VERSION:+==${TF_PACKAGE_VERSION}}
+
+RUN apt-get update -y && apt-get install -yq graphviz
+
+ARG KERAS_PACKAGE_VERSION=2.2.0
+RUN ${PIP} install keras{KERAS_PACKAGE_VERSION:+==${KERAS_PACKAGE_VERSION}}
+
+# 日本語設定
+RUN apt-get update &&  apt-get -y install language-pack-ja
+ENV LANG ja_JP.UTF-8
+ENV LANGUAGE ja_JP:ja
+ENV LC_ALL ja_JP.UTF-8
+ENV TZ JST-9
