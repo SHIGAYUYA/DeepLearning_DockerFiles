@@ -113,7 +113,7 @@ RUN ${PIP} install ${TF_PACKAGE}${TF_PACKAGE_VERSION:+==${TF_PACKAGE_VERSION}}
 RUN apt-get update -y && apt-get install -yq graphviz
 
 ARG KERAS_PACKAGE_VERSION=2.2.0
-RUN ${PIP} install keras{KERAS_PACKAGE_VERSION:+==${KERAS_PACKAGE_VERSION}}
+RUN ${PIP} install keras${KERAS_PACKAGE_VERSION:+==${KERAS_PACKAGE_VERSION}}
 
 # ì˙ñ{åÍê›íË
 RUN apt-get update &&  apt-get -y install language-pack-ja
